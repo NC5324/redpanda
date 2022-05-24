@@ -5,6 +5,7 @@ import { takeUntil } from 'rxjs/operators';
 
 import { AccountService } from 'app/core/auth/account.service';
 import { Account } from 'app/core/auth/account.model';
+import { KafkaHttpService } from 'app/kafka-demo/kafka.http.service';
 
 @Component({
   selector: 'jhi-home',
@@ -16,7 +17,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private readonly destroy$ = new Subject<void>();
 
-  constructor(private accountService: AccountService, private router: Router) {}
+  constructor(private accountService: AccountService, private kafkaService: KafkaHttpService, private router: Router) {}
 
   ngOnInit(): void {
     this.accountService
@@ -27,6 +28,13 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   login(): void {
     this.router.navigate(['/login']);
+  }
+
+  publishKafkaRecords(): void {
+    this.kafkaService
+      .publish()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => alert('success'));
   }
 
   ngOnDestroy(): void {
