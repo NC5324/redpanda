@@ -1,7 +1,9 @@
 package com.tu.pp.web.rest;
 
 import com.tu.pp.domain.User;
+import com.tu.pp.domain.UserSubscription;
 import com.tu.pp.repository.UserRepository;
+import com.tu.pp.repository.UserSubscriptionRepository;
 import com.tu.pp.security.SecurityUtils;
 import com.tu.pp.service.MailService;
 import com.tu.pp.service.UserService;
@@ -41,10 +43,18 @@ public class AccountResource {
 
     private final MailService mailService;
 
-    public AccountResource(UserRepository userRepository, UserService userService, MailService mailService) {
+    private final UserSubscriptionRepository subscriptionRepository;
+
+    public AccountResource(
+        UserRepository userRepository,
+        UserService userService,
+        MailService mailService,
+        UserSubscriptionRepository subscriptionRepository
+    ) {
         this.userRepository = userRepository;
         this.userService = userService;
         this.mailService = mailService;
+        this.subscriptionRepository = subscriptionRepository;
     }
 
     /**
@@ -62,7 +72,9 @@ public class AccountResource {
             throw new InvalidPasswordException();
         }
         User user = userService.registerUser(managedUserVM, managedUserVM.getPassword());
+        UserSubscription subscription = subscriptionRepository.save(new UserSubscription().user(user));
         mailService.sendActivationEmail(user);
+        mailService.sendSubscriptionRenewalMail(user, subscription);
     }
 
     /**

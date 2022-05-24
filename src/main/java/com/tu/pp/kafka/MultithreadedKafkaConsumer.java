@@ -16,10 +16,10 @@ import org.slf4j.LoggerFactory;
 
 public class MultithreadedKafkaConsumer implements Runnable {
 
-    private static final String KAFKA_TOPIC = "test";
+    private static final String KAFKA_TOPIC = "subscriptions";
 
     private final KafkaConsumer<String, String> consumer;
-    private final ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+    private final ExecutorService executor = Executors.newFixedThreadPool(8);
     private final Map<TopicPartition, SubscriptionRenewalTask> activeTasks = new HashMap<>();
     private final Map<TopicPartition, OffsetAndMetadata> offsetsToCommit = new HashMap<>();
     private final AtomicBoolean stopped = new AtomicBoolean(false);
@@ -41,7 +41,6 @@ public class MultithreadedKafkaConsumer implements Runnable {
         this.emailService = emailService;
         this.userRepository = userRepository;
         this.subscriptionRepository = subscriptionRepository;
-        new Thread(this).start();
     }
 
     @Override
@@ -82,6 +81,17 @@ public class MultithreadedKafkaConsumer implements Runnable {
         }
     }
 
+    private void checkActiveTasks() {
+        List<TopicPartition> finishedTasksPartitions = new ArrayList<>();
+        activeTasks.forEach((partition, task) -> {
+            if (task.isFinished()) finishedTasksPartitions.add(partition);
+            long offset = task.getCurrentOffset();
+            if (offset > 0) offsetsToCommit.put(partition, new OffsetAndMetadata(offset));
+        });
+        finishedTasksPartitions.forEach(activeTasks::remove);
+        consumer.resume(finishedTasksPartitions);
+    }
+
     private void commitOffsets() {
         try {
             long currentTimeMillis = System.currentTimeMillis();
@@ -95,21 +105,5 @@ public class MultithreadedKafkaConsumer implements Runnable {
         } catch (Exception e) {
             log.error("Failed to commit offsets!", e);
         }
-    }
-
-    private void checkActiveTasks() {
-        List<TopicPartition> finishedTasksPartitions = new ArrayList<>();
-        activeTasks.forEach((partition, task) -> {
-            if (task.isFinished()) finishedTasksPartitions.add(partition);
-            long offset = task.getCurrentOffset();
-            if (offset > 0) offsetsToCommit.put(partition, new OffsetAndMetadata(offset));
-        });
-        finishedTasksPartitions.forEach(activeTasks::remove);
-        consumer.resume(finishedTasksPartitions);
-    }
-
-    public void stopConsuming() {
-        stopped.set(true);
-        consumer.wakeup();
     }
 }

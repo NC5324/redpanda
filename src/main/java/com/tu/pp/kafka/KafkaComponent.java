@@ -29,19 +29,10 @@ public class KafkaComponent {
 
     private static final Logger log = LoggerFactory.getLogger(RedpandaKafkaResource.class);
 
-    private static final String KAFKA_TOPIC = "test";
-
     private final KafkaProperties kafkaProperties;
-    private final KafkaProducer<String, String> producer;
-    private final KafkaConsumer<String, String> consumer;
 
     private final UserRepository userRepository;
     private final UserSubscriptionRepository subscriptionRepository;
-
-    private final ExecutorService executor;
-    private final Map<TopicPartition, SubscriptionRenewalTask> activeTasks;
-    private final Map<TopicPartition, OffsetAndMetadata> offsetsToCommit;
-    private long lastCommitTime = System.currentTimeMillis();
 
     private final MailService emailService;
 
@@ -52,34 +43,29 @@ public class KafkaComponent {
         MailService emailService
     ) {
         this.kafkaProperties = kafkaProperties;
-        this.producer = new KafkaProducer<>(kafkaProperties.getProducerProps());
-        this.consumer = new KafkaConsumer<>(kafkaProperties.getConsumerProps());
 
         this.userRepository = userRepository;
         this.subscriptionRepository = subscriptionRepository;
 
-        this.executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-        this.activeTasks = new HashMap<>();
-        this.offsetsToCommit = new HashMap<>();
-
         this.emailService = emailService;
     }
 
-    @Scheduled(cron = "59 * * * * ?")
-    public void publish() {
-        List<UserSubscription> subscriptions = subscriptionRepository.findAllActive();
-        subscriptions.forEach(this::produceRecord);
-    }
-
-    private void produceRecord(final UserSubscription subscription) {
-        User user = Objects.requireNonNull(subscription.getUser());
-        producer.send(new ProducerRecord<>(KAFKA_TOPIC, String.valueOf(subscription.getId()), String.valueOf(user.getId())));
-    }
-
+    //    @Scheduled(cron = "59 * * * * ?")
+    //    public void publish() {
+    //        List<UserSubscription> subscriptions = subscriptionRepository.findAllActive();
+    //        subscriptions.forEach(this::produceRecord);
+    //    }
+    //
+    //    private void produceRecord(final UserSubscription subscription) {
+    //        User user = Objects.requireNonNull(subscription.getUser());
+    //        producer.send(new ProducerRecord<>(KAFKA_TOPIC, String.valueOf(subscription.getId()), String.valueOf(user.getId())));
+    //    }
+    //
     @EventListener(ApplicationReadyEvent.class)
     public void consume() {
         Properties config = new Properties();
         config.putAll(kafkaProperties.getConsumerProps());
-        new MultithreadedKafkaConsumer(config, emailService, userRepository, subscriptionRepository);
+        MultithreadedKafkaConsumer consumer = new MultithreadedKafkaConsumer(config, emailService, userRepository, subscriptionRepository);
+        new Thread(consumer).start();
     }
 }

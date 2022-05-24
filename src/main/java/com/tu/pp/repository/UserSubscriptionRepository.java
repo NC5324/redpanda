@@ -2,7 +2,9 @@ package com.tu.pp.repository;
 
 import com.tu.pp.domain.UserSubscription;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -15,5 +17,5 @@ public interface UserSubscriptionRepository extends JpaRepository<UserSubscripti
     List<UserSubscription> findByUserIsCurrentUser();
 
     @Query("select userSubscription from UserSubscription userSubscription where userSubscription.cancelled = false")
-    List<UserSubscription> findAllActive();
+    List<UserSubscription> findAllActive(Pageable pageable);
 }
